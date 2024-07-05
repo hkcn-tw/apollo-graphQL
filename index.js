@@ -20,6 +20,7 @@ const typeDefs = `#graphql
         id: Int!
         name: String
         bookIds: [Int]
+        books: [Book]
     }
 
     type Query {
@@ -35,6 +36,9 @@ const resolvers = {
         hello: () => "Hello World!",
         books: () => books,
         authors: () => authors
+    },
+    Author: {
+        books: (parent) => parent.bookIds.map(bookId => books.find(book => book.id == bookId))
     }
 };
 
