@@ -1,6 +1,7 @@
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
 import express from 'express';
+import { books, authors } from './sample_data.js'
 
 const app = express();
 
@@ -8,15 +9,32 @@ const app = express();
 // that together define the "shape" of queries that are executed against
 // your data.
 const typeDefs = `#graphql
-  type Query {
-    hello: String
-  }
+
+    type Book {
+        id: Int!
+        title: String
+        author: String
+    }
+
+    type Author {
+        id: Int!
+        name: String
+        bookIds: [Int]
+    }
+
+    type Query {
+        hello: String
+        books: [Book]
+        authors: [Author]
+    }
 `;
 
 // Resolvers define how to fetch the types defined in your schema.
 const resolvers = {
     Query: {
-        hello: () => "Hello World!"
+        hello: () => "Hello World!",
+        books: () => books,
+        authors: () => authors
     }
 };
 
