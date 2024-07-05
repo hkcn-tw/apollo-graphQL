@@ -130,7 +130,29 @@ app.get('/metrics', async (req, res) => {
     res.end(await register.metrics());
 });
 
+// Health check endpoint
+app.get('/health', async (req, res) => {
+    try {
+      const response = await fetch('http://localhost:4000/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apollo-require-preflight': 'true',
+        },
+        body: JSON.stringify({ query: '{ __typename }' }),
+      });
+      if (response.ok) {
+        res.status(200).send('OK');
+      } else {
+        res.status(response.status).send('Health check failed');
+      }
+    } catch (error) {
+      res.status(500).send('Health check failed');
+    }
+});
+
 app.listen(4000, () => {
-    console.log(`🚀 Server ready at http://localhost:4000/`);
+    console.log(`🚀 Server ready at http://localhost:4000/graphql`);
     console.log(`Prometheus metrics available at http://localhost:4000/metrics`);
+    console.log(`GraphQL server Health check available at http://localhost:4000/health`);
 });
