@@ -3,7 +3,7 @@ import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
 import express from 'express';
 import { books, authors } from './sample_data.js'
-import AzureServices from './azureServices.js';
+import AzureServices from './dataSources/azureServices.js';
 import {
     requestCounter,
     responseHistogram,
@@ -12,6 +12,7 @@ import {
     fieldResolveTime,
     default as register,
   } from './metrics.js';
+import PlainGraphQLAPI from './dataSources/plainGraphQL.js';
 
 const app = express();
 
@@ -24,6 +25,13 @@ const typeDefs = `#graphql
         id: Int!
         title: String
         author: String
+    }
+
+    type PlainGraphQLBook {
+        id: Int!
+        title: String
+        author: String
+        email: String
     }
 
     type Author {
@@ -51,6 +59,8 @@ const typeDefs = `#graphql
         book(bookId: Int!): Book
         authors: [Author]
         azureServices: [AzureService]
+        plainGraphQLBook(bookId: Int!): PlainGraphQLBook
+        plainGraphQLAllBooks: [PlainGraphQLBook]
     }
 `;
 
@@ -62,7 +72,9 @@ const resolvers = {
         books: () => books,
         book: (_parent, args) => books.find(book => book.id == args.bookId),
         authors: () => authors,
-        azureServices: async (_parent, _args, { dataSources }) => { return dataSources.azureServicesAPI.getServices()}
+        azureServices: async (_parent, _args, { dataSources }) => { return dataSources.azureServicesAPI.getServices()},
+        plainGraphQLBook: async (_parent, args, { dataSources }) => { return dataSources.plainGraphQLAPI.getBook(args.bookId)},
+        plainGraphQLAllBooks: async (_parent, _args, { dataSources }) => { return dataSources.plainGraphQLAPI.getAllBooks()}
     },
     Author: {
         books: (parent) => parent.bookIds.map(bookId => books.find(book => book.id == bookId))
@@ -128,6 +140,7 @@ app.use(
                 // Also we can create datasource based on user authentication
                 dataSources: {
                     azureServicesAPI: new AzureServices(),
+                    plainGraphQLAPI: new PlainGraphQLAPI(),
                 },
            };
          },
@@ -160,8 +173,10 @@ app.get('/health', async (_req, res) => {
     }
 });
 
+
+const PORT = process.env.PORT || 4000;
 app.listen(4000, () => {
-    console.log(`🚀 Server ready at http://localhost:4000/graphql`);
-    console.log(`Prometheus metrics available at http://localhost:4000/metrics`);
-    console.log(`GraphQL server Health check available at http://localhost:4000/health`);
+    console.log(`🚀 Server ready at http://localhost:${PORT}/graphql`);
+    console.log(`Prometheus metrics available at http://localhost:${PORT}/metrics`);
+    console.log(`GraphQL server Health check available at http://localhost:${PORT}/health`);
 });
