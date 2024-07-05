@@ -4,6 +4,14 @@ import { expressMiddleware } from '@apollo/server/express4';
 import express from 'express';
 import { books, authors } from './sample_data.js'
 import AzureServices from './azureServices.js';
+import {
+    requestCounter,
+    responseHistogram,
+    validationErrorsCounter,
+    executionErrorsCounter,
+    fieldResolveTime,
+    default as register,
+  } from './metrics.js';
 
 const app = express();
 
@@ -59,11 +67,44 @@ const resolvers = {
     }
 };
 
+// Middleware to track Prometheus metrics for GraphQL requests
+app.use((req, res, next) => {
+    const end = responseHistogram.startTimer();
+    res.on('finish', () => {
+        end();
+    });
+    next();
+});
+  
+  // Apollo Server Plugin for Prometheus Metrics
+const metricsPlugin = {
+    async requestDidStart(requestContext) {
+        requestCounter.inc({ operationName: requestContext.request.operationName || 'UnnamedOperation' });
+
+        return {
+        async executionDidStart() {
+            return {
+            willResolveField({ info }) {
+                const end = fieldResolveTime.startTimer({ fieldName: info.fieldName, typeName: info.parentType.name });
+                return (error) => {
+                end();
+                if (error) {
+                    executionErrorsCounter.inc({ operationName: info.operation.name ? info.operation.name.value : 'UnnamedOperation' });
+                }
+                };
+            },
+            };
+        },
+        };
+    },
+};
+
 // The ApolloServer constructor requires two parameters: your schema
 // definition and your set of resolvers.
 const server = new ApolloServer({
     typeDefs,
-    resolvers
+    resolvers,
+    plugins: [metricsPlugin],
 });
 
 await server.start();
@@ -84,6 +125,12 @@ app.use(
     }),
 );
 
+app.get('/metrics', async (req, res) => {
+    res.setHeader('Content-Type', register.contentType);
+    res.end(await register.metrics());
+});
+
 app.listen(4000, () => {
     console.log(`🚀 Server ready at http://localhost:4000/`);
+    console.log(`Prometheus metrics available at http://localhost:4000/metrics`);
 });

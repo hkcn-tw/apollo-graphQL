@@ -23,6 +23,7 @@
     "@opentelemetry/resources": "1.0",
     "@opentelemetry/sdk-trace-base": "1.0",
     "@opentelemetry/sdk-trace-node": "1.0",
-    "graphql": "^16.9.0"
+    "graphql": "^16.9.0",
+    "prom-client": "^15.1.3"
   }
 }
