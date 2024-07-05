@@ -46,6 +46,7 @@ const typeDefs = `#graphql
 
     type Query {
         hello: String
+        authUser: String
         books: [Book]
         book(bookId: Int!): Book
         authors: [Author]
@@ -57,6 +58,7 @@ const typeDefs = `#graphql
 const resolvers = {
     Query: {
         hello: () => "Hello World!",
+        authUser: (_parent,_args, { user }) => user,
         books: () => books,
         book: (_parent, args) => books.find(book => book.id == args.bookId),
         authors: () => authors,
@@ -113,25 +115,32 @@ app.use(
     '/graphql',
     express.json(),
     expressMiddleware(server, {
-        context: async () => {
-           return {
-             // We create new instances of our data sources with each request,
-             // passing in our server's cache.
-             dataSources: {
-               azureServicesAPI: new AzureServices(),
-             },
+        context: async ({ req }) => {
+            const token = req.headers.authorization
+            var user = `Invalid user, token:${token}`
+            if( token === 'DevX' ) {
+                user = 'Valid user'
+            }
+            return {
+                user,
+                // We create new instances of our data sources with each request
+                // passing in our server's cache.
+                // Also we can create datasource based on user authentication
+                dataSources: {
+                    azureServicesAPI: new AzureServices(),
+                },
            };
          },
     }),
 );
 
-app.get('/metrics', async (req, res) => {
+app.get('/metrics', async (_req, res) => {
     res.setHeader('Content-Type', register.contentType);
     res.end(await register.metrics());
 });
 
 // Health check endpoint
-app.get('/health', async (req, res) => {
+app.get('/health', async (_req, res) => {
     try {
       const response = await fetch('http://localhost:4000/graphql', {
         method: 'POST',
