@@ -13,8 +13,74 @@ import {
     default as register,
   } from './metrics.js';
 import PlainGraphQLAPI from './dataSources/plainGraphQL.js';
+import axios from 'axios';
+import bodyParser from 'body-parser';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const app = express();
+app.use(bodyParser.json());
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+// GitHub OAuth callback
+app.get('/callback', async (req, res) => {
+    const code = req.query.code;
+    const clientId = process.env.GITHUB_CLIENT_ID;
+    const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+  
+    try {
+      // Exchange code for access token
+      const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
+        client_id: clientId,
+        client_secret: clientSecret,
+        code: code
+      }, {
+        headers: {
+          accept: 'application/json'
+        }
+      });
+  
+      const accessToken = tokenResponse.data.access_token;
+  
+      // Redirect to the frontend with the token
+      res.redirect(`/dashboard.html?token=${accessToken}`);
+    } catch (error) {
+      res.status(500).send('Error getting access token');
+    }
+});
+
+  // Fetch repositories
+app.get('/repos', async (req, res) => {
+    const token = req.query.token;
+  
+    try {
+      const response = await axios.get('https://api.github.com/user/repos', {
+        headers: {
+          'Authorization': `token ${token}`
+        }
+      });
+      res.json(response.data);
+    } catch (error) {
+      res.status(500).send('Error fetching repositories');
+    }
+  });
+  
+// Serve the index.html
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Serve the GitHub client ID
+app.get('/client-id', (req, res) => {
+    res.json({ clientId: process.env.GITHUB_CLIENT_ID });
+});
 
 // A schema is a collection of type definitions (hence "typeDefs")
 // that together define the "shape" of queries that are executed against

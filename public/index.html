@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitHub OAuth Example</title>
+</head>
+<body>
+  <button id="login">Login with GitHub</button>
+  <script>
+    document.getElementById('login').onclick = () => {
+      fetch('/client-id')
+        .then(response => response.json())
+        .then(data => {
+          const clientId = data.clientId;
+          const redirectUri = 'http://localhost:4000/callback';
+          const scope = 'repo';
+          const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}`;
+          window.location.href = githubAuthUrl;
+        })
+        .catch(error => console.error('Error fetching client ID:', error));
+    };
+  </script>
+</body>
+</html>
