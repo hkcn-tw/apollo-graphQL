@@ -1,4 +1,4 @@
-import './open-telemetry.js';
+// import './open-telemetry.js';
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
 import express from 'express';
@@ -13,16 +13,20 @@ import {
     default as register,
   } from './metrics.js';
 import PlainGraphQLAPI from './dataSources/plainGraphQL.js';
+
 import axios from 'axios';
 import bodyParser from 'body-parser';
+import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import GitHubAPI from './dataSources/github.js';
 
 dotenv.config();
 
 const app = express();
 app.use(bodyParser.json());
+app.use(cookieParser());
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -118,6 +122,10 @@ const typeDefs = `#graphql
         geographies: [Geographies]
     }
 
+    type GithubRepo {
+        repo_name: String
+    }
+
     type Query {
         hello: String
         authUser: String
@@ -127,6 +135,7 @@ const typeDefs = `#graphql
         azureServices: [AzureService]
         plainGraphQLBook(bookId: Int!): PlainGraphQLBook
         plainGraphQLAllBooks: [PlainGraphQLBook]
+        getGithubRepos: [GithubRepo]
     }
 `;
 
@@ -134,13 +143,14 @@ const typeDefs = `#graphql
 const resolvers = {
     Query: {
         hello: () => "Hello World!",
-        authUser: (_parent,_args, { user }) => user,
+        authUser: (_parent,_args, { user }) => user.msg,
         books: () => books,
         book: (_parent, args) => books.find(book => book.id == args.bookId),
         authors: () => authors,
         azureServices: async (_parent, _args, { dataSources }) => { return dataSources.azureServicesAPI.getServices()},
         plainGraphQLBook: async (_parent, args, { dataSources }) => { return dataSources.plainGraphQLAPI.getBook(args.bookId)},
-        plainGraphQLAllBooks: async (_parent, _args, { dataSources }) => { return dataSources.plainGraphQLAPI.getAllBooks()}
+        plainGraphQLAllBooks: async (_parent, _args, { dataSources }) => { return dataSources.plainGraphQLAPI.getAllBooks()},
+        getGithubRepos: async (_parent, _args, { user, dataSources }) => {return dataSources.gitHubAPI.getRepos(user.githubToken)}
     },
     Author: {
         books: (parent) => parent.bookIds.map(bookId => books.find(book => book.id == bookId))
@@ -195,9 +205,15 @@ app.use(
     expressMiddleware(server, {
         context: async ({ req }) => {
             const token = req.headers.authorization
-            var user = `Invalid user, token:${token}`
+            var user = {
+                msg: `Invalid user, token:${token}`,
+                githubToken: ''
+            }
             if( token === 'DevX' ) {
-                user = 'Valid user'
+                user = {
+                    msg: 'Valid user',
+                    githubToken: req.cookies.githubToken
+                }
             }
             return {
                 user,
@@ -207,6 +223,7 @@ app.use(
                 dataSources: {
                     azureServicesAPI: new AzureServices(),
                     plainGraphQLAPI: new PlainGraphQLAPI(),
+                    gitHubAPI: new GitHubAPI(),
                 },
            };
          },
